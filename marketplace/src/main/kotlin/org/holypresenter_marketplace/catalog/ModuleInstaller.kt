@@ -18,6 +18,14 @@ internal class ModuleInstaller(
                 "Загрузка разрешена только по HTTPS"
             }
             modulesDirectory.mkdirs()
+            val targetFile = File(modulesDirectory, "${module.id}.jar")
+            if (
+                targetFile.isFile &&
+                sha256(targetFile).equals(module.sha256, ignoreCase = true)
+            ) {
+                enableModule(module.id)
+                return@runCatching "${module.name} уже установлен. Перезапустите HolyPresenter, чтобы включить модуль."
+            }
             val temporaryFile = File.createTempFile("${module.id}-", ".jar", modulesDirectory)
             try {
                 download(module.downloadUrl, temporaryFile)
@@ -27,7 +35,7 @@ internal class ModuleInstaller(
                 require(isHolyPresenterModule(temporaryFile)) {
                     "В загруженном JAR нет модуля HolyPresenter"
                 }
-                temporaryFile.copyTo(File(modulesDirectory, "${module.id}.jar"), overwrite = true)
+                temporaryFile.copyTo(targetFile, overwrite = true)
                 enableModule(module.id)
                 "${module.name} установлен. Перезапустите HolyPresenter, чтобы включить его."
             } finally {
