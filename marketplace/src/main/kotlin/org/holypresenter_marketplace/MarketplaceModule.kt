@@ -7,6 +7,8 @@ import holypresenter.org.platform.api.module.ModuleMetadata
 import org.holypresenter_marketplace.ui.MarketplaceWorkspace
 
 class MarketplaceModule : HolyModule {
+    private lateinit var context: ModuleContext
+
     override val metadata = ModuleMetadata(
         id = "marketplace",
         name = "Маркетплейс",
@@ -17,8 +19,12 @@ class MarketplaceModule : HolyModule {
         icon = "🛍️"
     )
 
+    override fun onLoad(context: ModuleContext) {
+        this.context = context
+    }
+
     @Composable
     override fun Workspace() {
-        MarketplaceWorkspace()
+        MarketplaceWorkspace(context)
     }
 }

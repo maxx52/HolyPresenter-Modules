@@ -29,6 +29,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import holypresenter.org.platform.api.application.ApplicationLifecycleService
+import holypresenter.org.platform.api.module.ModuleContext
 import kotlinx.coroutines.launch
 import org.holypresenter_marketplace.catalog.CatalogClient
 import org.holypresenter_marketplace.catalog.MarketplaceCatalog
@@ -37,15 +39,19 @@ import org.holypresenter_marketplace.catalog.ModuleInstaller
 import org.holypresenter_marketplace.catalog.ModuleInstallState
 
 @Composable
-fun MarketplaceWorkspace() {
+fun MarketplaceWorkspace(context: ModuleContext) {
     val catalogClient = remember { CatalogClient() }
     val installer = remember { ModuleInstaller() }
+    val applicationLifecycle = remember(context) {
+        context.services.get(ApplicationLifecycleService::class)
+    }
     val scope = rememberCoroutineScope()
     var catalog by remember { mutableStateOf<MarketplaceCatalog?>(null) }
     var search by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var isError by remember { mutableStateOf(false) }
+    var restartRequired by remember { mutableStateOf(false) }
     var moduleStates by remember { mutableStateOf<Map<String, ModuleInstallState>>(emptyMap()) }
 
     fun refreshStates(currentCatalog: MarketplaceCatalog?) {
@@ -103,6 +109,20 @@ fun MarketplaceWorkspace() {
             )
             catalog != null && modules.isEmpty() -> Text("В каталоге пока нет опубликованных модулей.")
         }
+        if (restartRequired) {
+            Button(
+                enabled = applicationLifecycle != null && !isLoading,
+                onClick = {
+                    applicationLifecycle?.restart()
+                        ?.onFailure {
+                            message = "Не удалось перезапустить HolyPresenter: ${it.message}"
+                            isError = true
+                        }
+                }
+            ) {
+                Text("Перезапустить HolyPresenter")
+            }
+        }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(modules, key = { it.id }) { module ->
                 ModuleCard(
@@ -112,10 +132,12 @@ fun MarketplaceWorkspace() {
                     onInstall = {
                         scope.launch {
                             isLoading = true
+                            restartRequired = false
                             installer.install(module)
                                 .onSuccess {
                                     message = it
                                     isError = false
+                                    restartRequired = true
                                     refreshStates(catalog)
                                 }
                                 .onFailure {
@@ -128,10 +150,12 @@ fun MarketplaceWorkspace() {
                     onUninstall = {
                         scope.launch {
                             isLoading = true
+                            restartRequired = false
                             installer.uninstall(module)
                                 .onSuccess {
                                     message = it
                                     isError = false
+                                    restartRequired = true
                                     refreshStates(catalog)
                                 }
                                 .onFailure {
