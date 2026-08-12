@@ -12,6 +12,17 @@ import java.util.prefs.Preferences
 internal class ModuleInstaller(
     private val modulesDirectory: File = defaultModulesDirectory()
 ) {
+    fun state(module: MarketplaceModuleInfo): ModuleInstallState {
+        val targetFile = File(modulesDirectory, "${module.id}.jar")
+        if (!targetFile.isFile) return ModuleInstallState.NOT_INSTALLED
+        if (module.id in disabledModuleIds()) return ModuleInstallState.DISABLED
+        return if (sha256(targetFile).equals(module.sha256, ignoreCase = true)) {
+            ModuleInstallState.INSTALLED
+        } else {
+            ModuleInstallState.UPDATE_AVAILABLE
+        }
+    }
+
     suspend fun install(module: MarketplaceModuleInfo): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             require(module.downloadUrl.startsWith("https://")) {
@@ -44,6 +55,19 @@ internal class ModuleInstaller(
         }
     }
 
+    fun uninstall(module: MarketplaceModuleInfo): Result<String> = runCatching {
+        disableModule(module.id)
+        val targetFile = File(modulesDirectory, "${module.id}.jar")
+        when {
+            !targetFile.exists() -> "${module.name} отключён."
+            targetFile.delete() -> "${module.name} удалён. Перезапустите HolyPresenter."
+            else -> {
+                targetFile.deleteOnExit()
+                "${module.name} отключён и будет удалён после закрытия HolyPresenter."
+            }
+        }
+    }
+
     private fun download(address: String, destination: File) {
         val connection = (URL(address).openConnection() as HttpURLConnection).apply {
             connectTimeout = 15_000
@@ -63,13 +87,24 @@ internal class ModuleInstaller(
 
     private fun enableModule(moduleId: String) {
         val preferences = Preferences.userRoot().node("org/holypresenter/modules")
-        val disabledIds = preferences.get("disabled", "")
-            .split(',')
-            .filter(String::isNotBlank)
-            .toMutableSet()
+        val disabledIds = disabledModuleIds()
         disabledIds -= moduleId
         preferences.put("disabled", disabledIds.sorted().joinToString(","))
     }
+
+    private fun disableModule(moduleId: String) {
+        val preferences = Preferences.userRoot().node("org/holypresenter/modules")
+        val disabledIds = disabledModuleIds()
+        disabledIds += moduleId
+        preferences.put("disabled", disabledIds.sorted().joinToString(","))
+    }
+
+    private fun disabledModuleIds(): MutableSet<String> =
+        Preferences.userRoot().node("org/holypresenter/modules")
+            .get("disabled", "")
+            .split(',')
+            .filter(String::isNotBlank)
+            .toMutableSet()
 
     private companion object {
         fun defaultModulesDirectory(): File {
@@ -80,4 +115,11 @@ internal class ModuleInstaller(
             return File(base, "HolyPresenter/modules")
         }
     }
+}
+
+internal enum class ModuleInstallState {
+    NOT_INSTALLED,
+    INSTALLED,
+    UPDATE_AVAILABLE,
+    DISABLED
 }

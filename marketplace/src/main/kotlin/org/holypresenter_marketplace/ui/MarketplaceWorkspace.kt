@@ -15,6 +15,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,6 +34,7 @@ import org.holypresenter_marketplace.catalog.CatalogClient
 import org.holypresenter_marketplace.catalog.MarketplaceCatalog
 import org.holypresenter_marketplace.catalog.MarketplaceModuleInfo
 import org.holypresenter_marketplace.catalog.ModuleInstaller
+import org.holypresenter_marketplace.catalog.ModuleInstallState
 
 @Composable
 fun MarketplaceWorkspace() {
@@ -43,14 +45,29 @@ fun MarketplaceWorkspace() {
     var search by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
+    var isError by remember { mutableStateOf(false) }
+    var moduleStates by remember { mutableStateOf<Map<String, ModuleInstallState>>(emptyMap()) }
+
+    fun refreshStates(currentCatalog: MarketplaceCatalog?) {
+        moduleStates = currentCatalog?.modules.orEmpty().associate { module ->
+            module.id to installer.state(module)
+        }
+    }
 
     fun refresh() {
         scope.launch {
             isLoading = true
             message = null
+            isError = false
             catalogClient.load()
-                .onSuccess { catalog = it }
-                .onFailure { message = "Не удалось загрузить каталог: ${it.message}" }
+                .onSuccess {
+                    catalog = it
+                    refreshStates(it)
+                }
+                .onFailure {
+                    message = "Не удалось загрузить каталог: ${it.message}"
+                    isError = true
+                }
             isLoading = false
         }
     }
@@ -80,27 +97,64 @@ fun MarketplaceWorkspace() {
         )
         when {
             isLoading && catalog == null -> CircularProgressIndicator()
-            message != null -> Text(message!!, color = MaterialTheme.colorScheme.error)
+            message != null -> Text(
+                message!!,
+                color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            )
             catalog != null && modules.isEmpty() -> Text("В каталоге пока нет опубликованных модулей.")
         }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(modules, key = { it.id }) { module ->
-                ModuleCard(module, isLoading) {
-                    scope.launch {
-                        isLoading = true
-                        installer.install(module)
-                            .onSuccess { message = it }
-                            .onFailure { message = "Не удалось установить модуль: ${it.message}" }
-                        isLoading = false
+                ModuleCard(
+                    module = module,
+                    state = moduleStates[module.id] ?: ModuleInstallState.NOT_INSTALLED,
+                    isLoading = isLoading,
+                    onInstall = {
+                        scope.launch {
+                            isLoading = true
+                            installer.install(module)
+                                .onSuccess {
+                                    message = it
+                                    isError = false
+                                    refreshStates(catalog)
+                                }
+                                .onFailure {
+                                    message = "Не удалось установить модуль: ${it.message}"
+                                    isError = true
+                                }
+                            isLoading = false
+                        }
+                    },
+                    onUninstall = {
+                        scope.launch {
+                            isLoading = true
+                            installer.uninstall(module)
+                                .onSuccess {
+                                    message = it
+                                    isError = false
+                                    refreshStates(catalog)
+                                }
+                                .onFailure {
+                                    message = "Не удалось удалить модуль: ${it.message}"
+                                    isError = true
+                                }
+                            isLoading = false
+                        }
                     }
-                }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ModuleCard(module: MarketplaceModuleInfo, isLoading: Boolean, onInstall: () -> Unit) {
+private fun ModuleCard(
+    module: MarketplaceModuleInfo,
+    state: ModuleInstallState,
+    isLoading: Boolean,
+    onInstall: () -> Unit,
+    onUninstall: () -> Unit
+) {
     Card(Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -114,7 +168,36 @@ private fun ModuleCard(module: MarketplaceModuleInfo, isLoading: Boolean, onInst
                 Spacer(Modifier.height(4.dp))
                 Text(module.description)
             }
-            Button(enabled = !isLoading, onClick = onInstall) { Text("Установить") }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    when (state) {
+                        ModuleInstallState.NOT_INSTALLED -> "Не установлен"
+                        ModuleInstallState.INSTALLED -> "Установлен"
+                        ModuleInstallState.UPDATE_AVAILABLE -> "Доступно обновление"
+                        ModuleInstallState.DISABLED -> "Отключён"
+                    },
+                    style = MaterialTheme.typography.labelMedium
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    enabled = !isLoading,
+                    onClick = onInstall
+                ) {
+                    Text(
+                        when (state) {
+                            ModuleInstallState.NOT_INSTALLED -> "Установить"
+                            ModuleInstallState.INSTALLED -> "Переустановить"
+                            ModuleInstallState.UPDATE_AVAILABLE -> "Обновить"
+                            ModuleInstallState.DISABLED -> "Включить"
+                        }
+                    )
+                }
+                if (state != ModuleInstallState.NOT_INSTALLED) {
+                    OutlinedButton(enabled = !isLoading, onClick = onUninstall) {
+                        Text("Удалить")
+                    }
+                }
+            }
         }
     }
 }
