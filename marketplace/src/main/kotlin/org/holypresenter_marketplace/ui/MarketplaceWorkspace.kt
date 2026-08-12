@@ -48,6 +48,7 @@ fun MarketplaceWorkspace() {
     var isError by remember { mutableStateOf(false) }
     var restartRequired by remember { mutableStateOf(false) }
     var moduleStates by remember { mutableStateOf<Map<String, ModuleInstallState>>(emptyMap()) }
+    var showingInstalled by remember { mutableStateOf(false) }
 
     fun refreshStates(currentCatalog: MarketplaceCatalog?) {
         moduleStates = currentCatalog?.modules.orEmpty().associate { module ->
@@ -74,10 +75,14 @@ fun MarketplaceWorkspace() {
     }
 
     LaunchedEffect(Unit) { refresh() }
-    val modules = catalog?.modules.orEmpty().filter { module ->
+    val catalogModules = catalog?.modules.orEmpty().filter { module ->
         search.isBlank() || listOf(module.name, module.description, module.category)
             .any { it.contains(search, ignoreCase = true) }
     }
+    val installedModules = catalogModules.filter { module ->
+        moduleStates[module.id] != null && moduleStates[module.id] != ModuleInstallState.NOT_INSTALLED
+    }
+    val modules = if (showingInstalled) installedModules else catalogModules
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -89,6 +94,23 @@ fun MarketplaceWorkspace() {
                 Text("Бесплатные модули HolyPresenter из официального каталога")
             }
             TextButton(enabled = !isLoading, onClick = ::refresh) { Text("Обновить") }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (showingInstalled) {
+                OutlinedButton(enabled = !isLoading, onClick = { showingInstalled = false }) {
+                    Text("Каталог")
+                }
+                Button(enabled = !isLoading, onClick = { showingInstalled = true }) {
+                    Text("Установленные (${installedModules.size})")
+                }
+            } else {
+                Button(enabled = !isLoading, onClick = { showingInstalled = false }) {
+                    Text("Каталог")
+                }
+                OutlinedButton(enabled = !isLoading, onClick = { showingInstalled = true }) {
+                    Text("Установленные (${installedModules.size})")
+                }
+            }
         }
         OutlinedTextField(
             value = search,
@@ -102,7 +124,10 @@ fun MarketplaceWorkspace() {
                 message!!,
                 color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
             )
-            catalog != null && modules.isEmpty() -> Text("В каталоге пока нет опубликованных модулей.")
+            catalog != null && modules.isEmpty() -> Text(
+                if (showingInstalled) "Установленных модулей пока нет."
+                else "В каталоге пока нет опубликованных модулей."
+            )
         }
         if (restartRequired) {
             Button(
@@ -200,6 +225,13 @@ private fun ModuleCard(
                 Text("${module.category} · ${module.author} · v${module.version}")
                 Spacer(Modifier.height(4.dp))
                 Text(module.description)
+                if (module.dependencies.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Зависимости: ${module.dependencies.joinToString { it.id }}",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
