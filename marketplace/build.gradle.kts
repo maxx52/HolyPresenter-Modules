@@ -28,7 +28,7 @@ tasks.withType<Jar>().configureEach {
 val holyPresenterModulesDir =
     providers.gradleProperty("holyPresenterModulesDir")
         .map(::file)
-        .orElse(layout.projectDirectory.dir("../HolyPresenter/desktopApp/modules").asFile)
+        .orElse(layout.projectDirectory.dir("../../HolyPresenter/desktopApp/modules").asFile)
 
 val installModule by tasks.registering(Copy::class) {
     description = "Copies the Marketplace module into HolyPresenter"
