@@ -19,5 +19,14 @@ data class MarketplaceModuleInfo(
     val category: String = "Другое",
     val apiVersion: String,
     val downloadUrl: String,
+    val sha256: String,
+    val dependencies: List<MarketplaceDependency> = emptyList()
+)
+
+@Serializable
+data class MarketplaceDependency(
+    val id: String,
+    val fileName: String,
+    val downloadUrl: String,
     val sha256: String
 )

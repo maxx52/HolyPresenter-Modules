@@ -37,6 +37,7 @@ internal class ModuleInstaller(
                 enableModule(module.id)
                 return@runCatching "${module.name} уже установлен. Перезапустите HolyPresenter, чтобы включить модуль."
             }
+            module.dependencies.forEach(::installDependency)
             val temporaryFile = File.createTempFile("${module.id}-", ".jar", modulesDirectory)
             try {
                 download(module.downloadUrl, temporaryFile)
@@ -75,6 +76,29 @@ internal class ModuleInstaller(
             if (responseCode !in 200..299) error("Сервер вернул HTTP $responseCode")
         }
         connection.inputStream.use { input -> destination.outputStream().use(input::copyTo) }
+    }
+
+    private fun installDependency(dependency: MarketplaceDependency) {
+        require(dependency.downloadUrl.startsWith("https://")) {
+            "Загрузка зависимости ${dependency.id} разрешена только по HTTPS"
+        }
+        val targetFile = File(modulesDirectory, dependency.fileName)
+        if (
+            targetFile.isFile &&
+            sha256(targetFile).equals(dependency.sha256, ignoreCase = true)
+        ) {
+            return
+        }
+        val temporaryFile = File.createTempFile("${dependency.id}-", ".jar", modulesDirectory)
+        try {
+            download(dependency.downloadUrl, temporaryFile)
+            require(sha256(temporaryFile).equals(dependency.sha256, ignoreCase = true)) {
+                "Контрольная сумма зависимости ${dependency.id} не совпадает"
+            }
+            temporaryFile.copyTo(targetFile, overwrite = true)
+        } finally {
+            temporaryFile.delete()
+        }
     }
 
     private fun sha256(file: File): String =
