@@ -12,6 +12,26 @@
       "apiVersion": "0.6.0",
       "downloadUrl": "https://github.com/maxx52/HolyPresenter-Modules/releases/download/bible-1.0.0/bible.jar",
       "sha256": "64153e5329b3442db7fc42e5a87c428e093d4840c483848cae7c7d5a0af26d04"
+    },
+    {
+      "id": "songs",
+      "name": "Песни",
+      "version": "1.0.0",
+      "author": "HolyPresenter",
+      "description": "Библиотека песен, редактор с аккордами и вывод слайдов на экран.",
+      "icon": "🎵",
+      "category": "Служение",
+      "apiVersion": "0.6.0",
+      "downloadUrl": "https://github.com/maxx52/HolyPresenter-Modules/releases/download/songs-1.0.0/songs.jar",
+      "sha256": "f7a48643bbc611ae5932fb27cda4b85876c9c821672a50a103906d5eb3a2a10d",
+      "dependencies": [
+        {
+          "id": "platform-ui",
+          "fileName": "desktopApp-0.7.3.jar",
+          "downloadUrl": "https://github.com/maxx52/HolyPresenter-Modules/releases/download/songs-1.0.0/desktopApp-0.7.3.jar",
+          "sha256": "63a73c95f043a03c0c9e7837f707e0ca81dd4eada32a02bfc8d53b0cf77f20a2"
+        }
+      ]
     }
   ]
 }
