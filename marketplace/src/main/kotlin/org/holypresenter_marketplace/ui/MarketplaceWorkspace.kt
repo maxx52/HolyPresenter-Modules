@@ -29,8 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import holypresenter.org.platform.api.application.ApplicationLifecycleService
-import holypresenter.org.platform.api.module.ModuleContext
 import kotlinx.coroutines.launch
 import org.holypresenter_marketplace.catalog.CatalogClient
 import org.holypresenter_marketplace.catalog.MarketplaceCatalog
@@ -39,12 +37,9 @@ import org.holypresenter_marketplace.catalog.ModuleInstaller
 import org.holypresenter_marketplace.catalog.ModuleInstallState
 
 @Composable
-fun MarketplaceWorkspace(context: ModuleContext) {
+fun MarketplaceWorkspace() {
     val catalogClient = remember { CatalogClient() }
     val installer = remember { ModuleInstaller() }
-    val applicationLifecycle = remember(context) {
-        context.services.get(ApplicationLifecycleService::class)
-    }
     val scope = rememberCoroutineScope()
     var catalog by remember { mutableStateOf<MarketplaceCatalog?>(null) }
     var search by remember { mutableStateOf("") }
@@ -111,10 +106,10 @@ fun MarketplaceWorkspace(context: ModuleContext) {
         }
         if (restartRequired) {
             Button(
-                enabled = applicationLifecycle != null && !isLoading,
+                enabled = !isLoading,
                 onClick = {
-                    applicationLifecycle?.restart()
-                        ?.onFailure {
+                    RestartController.restart()
+                        .onFailure {
                             message = "Не удалось перезапустить HolyPresenter: ${it.message}"
                             isError = true
                         }
@@ -168,6 +163,20 @@ fun MarketplaceWorkspace(context: ModuleContext) {
                 )
             }
         }
+    }
+}
+
+private object RestartController {
+    fun restart(): Result<Unit> = runCatching { relaunchAndExit() }
+
+    private fun relaunchAndExit() {
+        val process = ProcessHandle.current().info()
+        val command = process.command().orElseThrow {
+            IllegalStateException("Не удалось определить команду запуска HolyPresenter")
+        }
+        val arguments = process.arguments().orElse(emptyArray())
+        ProcessBuilder(listOf(command) + arguments).start()
+        kotlin.system.exitProcess(0)
     }
 }
 
