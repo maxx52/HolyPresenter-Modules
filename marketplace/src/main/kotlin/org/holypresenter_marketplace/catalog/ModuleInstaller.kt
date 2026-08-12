@@ -7,6 +7,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import java.util.jar.JarFile
+import java.util.prefs.Preferences
 
 internal class ModuleInstaller(
     private val modulesDirectory: File = defaultModulesDirectory()
@@ -27,6 +28,7 @@ internal class ModuleInstaller(
                     "В загруженном JAR нет модуля HolyPresenter"
                 }
                 temporaryFile.copyTo(File(modulesDirectory, "${module.id}.jar"), overwrite = true)
+                enableModule(module.id)
                 "${module.name} установлен. Перезапустите HolyPresenter, чтобы включить его."
             } finally {
                 temporaryFile.delete()
@@ -49,6 +51,16 @@ internal class ModuleInstaller(
 
     private fun isHolyPresenterModule(file: File): Boolean = JarFile(file).use { archive ->
         archive.getEntry("META-INF/services/holypresenter.org.platform.api.module.HolyModule") != null
+    }
+
+    private fun enableModule(moduleId: String) {
+        val preferences = Preferences.userRoot().node("org/holypresenter/modules")
+        val disabledIds = preferences.get("disabled", "")
+            .split(',')
+            .filter(String::isNotBlank)
+            .toMutableSet()
+        disabledIds -= moduleId
+        preferences.put("disabled", disabledIds.sorted().joinToString(","))
     }
 
     private companion object {
