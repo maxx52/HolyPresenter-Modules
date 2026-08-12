@@ -1,4 +1,17 @@
 {
   "formatVersion": 1,
-  "modules": []
+  "modules": [
+    {
+      "id": "bible",
+      "name": "Библия",
+      "version": "1.0.0",
+      "author": "HolyPresenter",
+      "description": "Чтение, поиск, предпросмотр и вывод библейских стихов на экран.",
+      "icon": "📖",
+      "category": "Служение",
+      "apiVersion": "0.6.0",
+      "downloadUrl": "https://github.com/maxx52/HolyPresenter-Modules/releases/download/bible-1.0.0/bible.jar",
+      "sha256": "64153e5329b3442db7fc42e5a87c428e093d4840c483848cae7c7d5a0af26d04"
+    }
+  ]
 }
